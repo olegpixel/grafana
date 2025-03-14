@@ -2,6 +2,7 @@ import { css, cx } from '@emotion/css';
 import { CSSProperties, ReactElement, ReactNode, useId, useRef, useState } from 'react';
 import * as React from 'react';
 import { useMeasure, useToggle } from 'react-use';
+import { useInView } from 'react-intersection-observer';
 
 import { GrafanaTheme2, LoadingState } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
@@ -152,6 +153,11 @@ export function PanelChrome({
   const { isSelected, onSelect, isSelectable } = useElementSelection(selectionId);
   const pointerDownPos = useRef<{ screenX: number; screenY: number }>({ screenX: 0, screenY: 0 });
 
+  const { ref: panelRef, inView } = useInView({
+    triggerOnce: false, // Load/unload dynamically
+    threshold: 0.01, // Load panel when 1% visible
+  });
+
   const hasHeader = !hoverHeader;
 
   const [isOpen, toggleOpen] = useToggle(true);
@@ -300,89 +306,93 @@ export function PanelChrome({
 
   return (
     // tabIndex={0} is needed for keyboard accessibility in the plot area
-    <section
-      className={cx(
-        styles.container,
-        isPanelTransparent && styles.transparentContainer,
-        isSelected && 'dashboard-selected-element',
-        !isSelected && isSelectable && selectableHighlight && 'dashboard-selectable-element'
-      )}
-      style={containerStyles}
-      aria-labelledby={!!title ? panelTitleId : undefined}
-      data-testid={testid}
-      tabIndex={0} // eslint-disable-line jsx-a11y/no-noninteractive-tabindex
-      onFocus={onFocus}
-      onMouseMove={onMouseMove}
-      onMouseEnter={onMouseEnter}
-      ref={ref}
-    >
-      <div className={styles.loadingBarContainer}>
-        {loadingState === LoadingState.Loading ? (
-          <LoadingBar width={loadingBarWidth} ariaLabel="Panel loading bar" />
-        ) : null}
-      </div>
+    <div ref={panelRef}>
+      {inView && (
+        <section
+          className={cx(
+            styles.container,
+            isPanelTransparent && styles.transparentContainer,
+            isSelected && 'dashboard-selected-element',
+            !isSelected && isSelectable && selectableHighlight && 'dashboard-selectable-element'
+          )}
+          style={containerStyles}
+          aria-labelledby={!!title ? panelTitleId : undefined}
+          data-testid={testid}
+          tabIndex={0} // eslint-disable-line jsx-a11y/no-noninteractive-tabindex
+          onFocus={onFocus}
+          onMouseMove={onMouseMove}
+          onMouseEnter={onMouseEnter}
+          ref={ref}
+        >
+          <div className={styles.loadingBarContainer}>
+            {loadingState === LoadingState.Loading ? (
+              <LoadingBar width={loadingBarWidth} ariaLabel="Panel loading bar" />
+            ) : null}
+          </div>
 
-      {hoverHeader && (
-        <>
-          <HoverWidget
-            menu={menu}
-            title={typeof title === 'string' ? title : undefined}
-            offset={hoverHeaderOffset}
-            dragClass={dragClass}
-            onOpenMenu={onOpenMenu}
-          >
-            {headerContent}
-          </HoverWidget>
+          {hoverHeader && (
+            <>
+              <HoverWidget
+                menu={menu}
+                title={typeof title === 'string' ? title : undefined}
+                offset={hoverHeaderOffset}
+                dragClass={dragClass}
+                onOpenMenu={onOpenMenu}
+              >
+                {headerContent}
+              </HoverWidget>
 
-          {statusMessage && (
-            <div className={styles.errorContainerFloating}>
-              <PanelStatus message={statusMessage} onClick={statusMessageOnClick} ariaLabel="Panel status" />
+              {statusMessage && (
+                <div className={styles.errorContainerFloating}>
+                  <PanelStatus message={statusMessage} onClick={statusMessageOnClick} ariaLabel="Panel status" />
+                </div>
+              )}
+            </>
+          )}
+
+          {hasHeader && (
+            <div
+              className={cx(styles.headerContainer, dragClass)}
+              style={headerStyles}
+              data-testid="header-container"
+              onPointerDown={onPointerDown}
+              onMouseEnter={isSelectable ? onHeaderEnter : undefined}
+              onMouseLeave={isSelectable ? onHeaderLeave : undefined}
+              onPointerUp={onPointerUp}
+            >
+              {statusMessage && (
+                <div className={dragClassCancel}>
+                  <PanelStatus message={statusMessage} onClick={statusMessageOnClick} ariaLabel="Panel status" />
+                </div>
+              )}
+
+              {headerContent}
+
+              {menu && (
+                <PanelMenu
+                  menu={menu}
+                  title={typeof title === 'string' ? title : undefined}
+                  placement="bottom-end"
+                  menuButtonClass={cx(styles.menuItem, dragClassCancel, showOnHoverClass)}
+                  onOpenMenu={onOpenMenu}
+                />
+              )}
             </div>
           )}
-        </>
-      )}
 
-      {hasHeader && (
-        <div
-          className={cx(styles.headerContainer, dragClass)}
-          style={headerStyles}
-          data-testid="header-container"
-          onPointerDown={onPointerDown}
-          onMouseEnter={isSelectable ? onHeaderEnter : undefined}
-          onMouseLeave={isSelectable ? onHeaderLeave : undefined}
-          onPointerUp={onPointerUp}
-        >
-          {statusMessage && (
-            <div className={dragClassCancel}>
-              <PanelStatus message={statusMessage} onClick={statusMessageOnClick} ariaLabel="Panel status" />
+          {!collapsed && (
+            <div
+              id={panelContentId}
+              data-testid={selectors.components.Panels.Panel.content}
+              className={cx(styles.content, height === undefined && styles.containNone)}
+              style={contentStyle}
+            >
+              {typeof children === 'function' ? children(innerWidth, innerHeight) : children}
             </div>
           )}
-
-          {headerContent}
-
-          {menu && (
-            <PanelMenu
-              menu={menu}
-              title={typeof title === 'string' ? title : undefined}
-              placement="bottom-end"
-              menuButtonClass={cx(styles.menuItem, dragClassCancel, showOnHoverClass)}
-              onOpenMenu={onOpenMenu}
-            />
-          )}
-        </div>
+        </section>
       )}
-
-      {!collapsed && (
-        <div
-          id={panelContentId}
-          data-testid={selectors.components.Panels.Panel.content}
-          className={cx(styles.content, height === undefined && styles.containNone)}
-          style={contentStyle}
-        >
-          {typeof children === 'function' ? children(innerWidth, innerHeight) : children}
-        </div>
-      )}
-    </section>
+    </div>
   );
 }
 
