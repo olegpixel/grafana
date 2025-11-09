@@ -129,7 +129,7 @@ describe('TimePickerContent', () => {
       await user.type(searchInput, '30m');
 
       await waitFor(() => {
-        expect(screen.getByText('Last 30m')).toBeInTheDocument();
+        expect(screen.getByText('Last 30 minutes')).toBeInTheDocument();
       });
     });
 
@@ -141,7 +141,19 @@ describe('TimePickerContent', () => {
       await user.type(searchInput, '1h30m');
 
       await waitFor(() => {
-        expect(screen.getByText('Last 1h 30m')).toBeInTheDocument();
+        expect(screen.getByText('Last 1 hour 30 minutes')).toBeInTheDocument();
+      });
+    });
+
+    it('uses singular form for single units', async () => {
+      const user = userEvent.setup();
+      renderComponent({ value: relativeValue });
+
+      const searchInput = screen.getByPlaceholderText(/search quick ranges/i);
+      await user.type(searchInput, '1h');
+
+      await waitFor(() => {
+        expect(screen.getByText('Last 1 hour')).toBeInTheDocument();
       });
     });
 
@@ -163,12 +175,12 @@ describe('TimePickerContent', () => {
       renderComponent({ value: relativeValue });
 
       const searchInput = screen.getByPlaceholderText(/search quick ranges/i);
-      await user.type(searchInput, '30m');
+      await user.type(searchInput, '45m');
 
       await waitFor(() => {
-        expect(screen.getByText('Last 30m')).toBeInTheDocument();
+        expect(screen.getByText('Last 45 minutes')).toBeInTheDocument();
       });
-      
+
       expect(screen.queryByText(/Last 5 minutes/i)).not.toBeInTheDocument();
     });
 
